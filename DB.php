@@ -6,6 +6,15 @@ use stdClass;
 use PDO;
 use PDOStatement;
 
+
+/**
+ * @method self query(string $sql, array $params = []) Prepare SQL query
+ * @method static self query(string $sql, array $params = []) Prepare SQL query
+ * @method ?int execute() Execute prepared query, returns ID or affected rows
+ * @method array|stdClass|null get(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Fetch all results
+ * @method array|stdClass|null first(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Fetch first result
+ * @method PaginatedDataset paginate(int $perPage = 15, ?string $pageGETParamName = 'page', ?int $page = null, int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Paginate results
+ */
 class DB {
 
 	private static $allowedPDOModes = [PDO::FETCH_ASSOC, PDO::FETCH_OBJ];
