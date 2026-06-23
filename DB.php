@@ -26,7 +26,7 @@ class DB {
 	private static ?string $dsn = null;
 	public static bool $isReady = false;
 
-	private PDO $pdo;
+	private ?PDO $pdo = null;
 	public ?string $sql = null;
 	public ?PDOStatement $stmt = null;
 	public array $queryParams = [];
@@ -132,6 +132,7 @@ class DB {
 
 			if( ! self::$isReady ){ throw new \Exception('DB: class not ready, please set all the parameters first using ::setParams().');  }
 
+			if( ! is_null($this->pdo) ){ return; }
 			$this->pdo = new PDO(self::$dsn, self::$user, self::$pass);
 			$this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
