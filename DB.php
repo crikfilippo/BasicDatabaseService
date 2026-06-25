@@ -285,7 +285,7 @@ class DB {
 
 	private function mapResult(?array $mapColumnToAttribute = null, int $mode = PDO::FETCH_OBJ) : array|stdClass|null {
 		try{
-			$isSingleResult = ( array_keys($this->queryResult)[0] ?? -1) === 0;
+			$isSingleResult = ( array_keys($this->queryResult)[0] ?? -1) !== 0;
 			if($mode == PDO::FETCH_ASSOC && is_null($mapColumnToAttribute)){ //no conversion needed
 				$this->queryResult = $isSingleResult ? $this->queryResult[0] : $this->queryResult;
 				return $this->queryResult; 
