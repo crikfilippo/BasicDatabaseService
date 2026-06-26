@@ -208,7 +208,7 @@ class DB {
 		}
     }
 
-	public function get(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : array|stdClass|null {
+	public function get(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null, bool $isSingleResult = false) : array|stdClass|null {
 		try{
 			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
 			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
@@ -216,7 +216,7 @@ class DB {
 			$this->stmt->execute(); 
 			$this->queryResult = $this->stmt->fetchAll(PDO::FETCH_ASSOC) ?? [];
 			if(empty($this->queryResult) || $this->queryResult === false){ $this->queryResult = []; return []; }
-			return $this->mapResult($mapColumnToAttribute,$mode);
+			return $this->mapResult($mapColumnToAttribute,$mode,$isSingleResult);
 		}catch(\Throwable $t){
 			die(
 				'DB: error while fetching data. '
@@ -231,7 +231,7 @@ class DB {
 			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
 			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
 			$this->query("SELECT * FROM (".$this->sql.") a LIMIT 1", $this->queryParams);	
-			return $this->get($mode,$mapColumnToAttribute) ?? null;
+			return $this->get($mode,$mapColumnToAttribute,true) ?? null;
 		}catch(\Throwable $t){
 			die(
 				'DB: error while preparing the query. '
@@ -283,9 +283,9 @@ class DB {
 		}	
 	}
 
-	private function mapResult(?array $mapColumnToAttribute = null, int $mode = PDO::FETCH_OBJ) : array|stdClass|null {
+	private function mapResult(?array $mapColumnToAttribute = null, int $mode = PDO::FETCH_OBJ, bool $isSingleResult = false) : array|stdClass|null {
 		try{
-			$isSingleResult = ( array_keys($this->queryResult)[0] ?? -1) !== 0;
+			//$isSingleResult = ( array_keys($this->queryResult)[0] ?? -1) !== 0;
 			if($mode == PDO::FETCH_ASSOC && is_null($mapColumnToAttribute)){ //no conversion needed
 				$this->queryResult = $isSingleResult ? $this->queryResult[0] : $this->queryResult;
 				return $this->queryResult; 
