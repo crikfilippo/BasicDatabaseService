@@ -38,6 +38,10 @@ class DB {
 		$this->reset();
 	}
 
+	public static function checkReady(){
+        if( ! self::$isReady){ throw new \Exception('DB not initialized, please use ::setParams()'); }
+    }
+
     public static function setParams(
 		#[\SensitiveParameter] ?string $host = null, 
 		#[\SensitiveParameter] ?int $port = null, 
@@ -130,7 +134,7 @@ class DB {
 			$this->affectedRows = 0;
 			$this->lastInsertId = null;
 
-			if( ! self::$isReady ){ throw new \Exception('DB: class not ready, please set all the parameters first using ::setParams().');  }
+			self::checkReady();
 
 			if( ! is_null($this->pdo) ){ return; }
 			$this->pdo = new PDO(self::$dsn, self::$user, self::$pass);
@@ -175,6 +179,7 @@ class DB {
 		string $sql, 
 		array $params = [] //associative
 	 ): self {
+		self::checkReady();
 		try{
 			$db->reset();
 			$db->sql = $sql;
@@ -191,6 +196,7 @@ class DB {
 	}
 
 	public function execute(): ?int {
+		self::checkReady();
 		try{
 			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
 			$this->queryResult = $this->stmt->execute($this->queryParams);
@@ -209,6 +215,7 @@ class DB {
     }
 
 	public function get(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null, bool $isSingleResult = false) : array|stdClass|null {
+		self::checkReady();
 		try{
 			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
 			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
@@ -227,11 +234,12 @@ class DB {
 	}
 
 	public function first(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : array|stdClass|null {
+		self::checkReady();
 		try{
 			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
 			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
 			$this->query("SELECT * FROM (".$this->sql.") a LIMIT 1", $this->queryParams);	
-			return $this->get($mode,$mapColumnToAttribute,true) ?? null;
+			return $this->get($mode,$mapColumnToAttribute, isSingleResult : true) ?? null;
 		}catch(\Throwable $t){
 			die(
 				'DB: error while preparing the query. '
@@ -242,6 +250,7 @@ class DB {
 	}
 
 	public function paginate(int $perPage = 15, ?string $pageGETParamName = 'page', ?int $page = null, int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : PaginatedDataset{
+		self::checkReady();	
 		try{
 			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
 			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
@@ -285,7 +294,6 @@ class DB {
 
 	private function mapResult(?array $mapColumnToAttribute = null, int $mode = PDO::FETCH_OBJ, bool $isSingleResult = false) : array|stdClass|null {
 		try{
-			//$isSingleResult = ( array_keys($this->queryResult)[0] ?? -1) !== 0;
 			if($mode == PDO::FETCH_ASSOC && is_null($mapColumnToAttribute)){ //no conversion needed
 				$this->queryResult = $isSingleResult ? $this->queryResult[0] : $this->queryResult;
 				return $this->queryResult; 
@@ -346,5 +354,7 @@ class PaginatedDataset{
 		$this->items = $items;
 
 	}
+
+}
 
 }
