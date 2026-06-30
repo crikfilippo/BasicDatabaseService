@@ -293,16 +293,15 @@ class DB {
 	}
 
 	private function mapResult(?array $mapColumnToAttribute = null, int $mode = PDO::FETCH_OBJ, bool $isSingleResult = false) : array|stdClass|null {
-		try{
+		try{ 
 			if($mode == PDO::FETCH_ASSOC && is_null($mapColumnToAttribute)){ //no conversion needed
 				$this->queryResult = $isSingleResult ? $this->queryResult[0] : $this->queryResult;
 				return $this->queryResult; 
 			} 
 			if( ! is_null($mapColumnToAttribute) && empty($mapColumnToAttribute)){ return $isSingleResult ? null : []; }
-			$srcResults = $isSingleResult ? [$this->queryResult] : $this->queryResult;
-			$columns = array_keys($isSingleResult ? $this->queryResult : $this->queryResult[0]);
+			$columns = array_keys($this->queryResult[0]);
 			$finalResults = [];
-			foreach ($srcResults as $srcResult) {
+			foreach ($this->queryResult as $srcResult) {
 				$finalResult = $mode == PDO::FETCH_OBJ ? new stdClass() : [];
 				foreach ($columns as $column) {
 					//no map, keep original column name as attribute name
