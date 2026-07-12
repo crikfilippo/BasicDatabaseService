@@ -5,18 +5,11 @@ namespace DB;
 use stdClass;
 use PDO;
 use PDOStatement;
+use Exception;
 
-
-/**
- * @method self query(string $sql, array $params = []) Prepare SQL query
- * @method static self query(string $sql, array $params = []) Prepare SQL query
- * @method ?int execute() Execute prepared query, returns ID or affected rows
- * @method array|stdClass|null get(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Fetch all results
- * @method array|stdClass|null first(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Fetch first result
- * @method PaginatedDataset paginate(int $perPage = 15, ?string $pageGETParamName = 'page', ?int $page = null, int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Paginate results
- */
 class DB {
 
+	private static bool $exposeErrorMessages = false;
 	private static $allowedPDOModes = [PDO::FETCH_ASSOC, PDO::FETCH_OBJ];
 	private static ?string $host = null;
 	private static ?int $port = null;
@@ -39,7 +32,7 @@ class DB {
 	}
 
 	public static function checkReady(){
-        if( ! self::$isReady){ throw new \Exception('DB not initialized, please use ::setParams()'); }
+        if( ! self::$isReady){ throw new Exception('DB not initialized, please use ::setParams()'); }
     }
 
     public static function setParams(
@@ -84,7 +77,7 @@ class DB {
 			//invalid params
 			if( empty($host) || empty($port) || empty($dbname) || empty($user) || empty($pass)){ 
 
-				throw new \Exception('DB: invalid parameters'); 
+				throw new Exception('DB: invalid parameters'); 
 
 			}
 
@@ -99,7 +92,7 @@ class DB {
 			self::$isReady = true;
 
 			//test connection
-			self::query('SELECT 1')->first();
+			self::query('SELECT 1 chk')->first();
 
 			
 
@@ -117,7 +110,11 @@ class DB {
 			self::$isReady = false;
 
 			//hide sensitive data from trace
-			die('DB: cannot establish connection.'); 
+			throw new Exception(
+				'DB: cannot establish connection. '
+				.PHP_EOL.'line '.$t->getLine()
+			);
+			die(); 
 
 		}
 
@@ -141,11 +138,14 @@ class DB {
 			$this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 		}catch(\Throwable $t){
-			die(
-				'DB: error while resetting the class. '
-				.PHP_EOL.$t->getMessage()
-				.PHP_EOL.$t->getLine()
-			); 
+
+			throw new Exception(
+				message : 'DB: error while resetting the class. '
+				.PHP_EOL.'line '.$t->getLine()
+				,previous : self::$exposeErrorMessages ? $t : null
+			);
+			die(); 
+
 		}
 
 	}
@@ -187,18 +187,19 @@ class DB {
 			$db->stmt = $db->pdo->prepare($sql);
 			return $db;
 		}catch(\Throwable $t){
-			die(
-				'DB: error while preparing the query. '
-				.PHP_EOL.$t->getMessage()
-				.PHP_EOL.$t->getLine()
-			); 
+			throw new Exception(
+				message : 'DB: error while preparing the query.  '
+				.PHP_EOL.'line '.$t->getLine()
+				,previous : self::$exposeErrorMessages ? $t : null
+			);
+			die(); 
 		}
 	}
 
 	public function execute(): ?int {
 		self::checkReady();
 		try{
-			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
+			if( is_null($this->stmt) ){ throw new Exception('no query prepared'); }
 			$this->queryResult = $this->stmt->execute($this->queryParams);
 			$this->affectedRows = $this->stmt->rowCount();
 			$this->lastInsertId = $this->pdo->lastInsertId();
@@ -206,54 +207,60 @@ class DB {
 			else{ $res = $this->affectedRows; }
 			return is_int($res) ? $res : null;
 		}catch(\Throwable $t){
-			die(
-				'DB: error while executing the query. '
-				.PHP_EOL.$t->getMessage()
-				.PHP_EOL.$t->getLine()
-			); 
+			throw new Exception(
+				message : 'DB: error while executing the query.  '
+				.PHP_EOL.'line '.$t->getLine()
+				,previous : self::$exposeErrorMessages ? $t : null
+			);
+			die(); 
 		}
     }
 
 	public function get(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null, bool $isSingleResult = false) : array|stdClass|null {
 		self::checkReady();
 		try{
-			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
-			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
+			if( is_null($this->stmt) ){ throw new Exception('no query prepared'); }
+			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new Exception('invalid PDO fetch mode'); }
 			foreach ($this->queryParams as $key => $value) { $this->stmt->bindValue(':'.$key, $value); }
 			$this->stmt->execute(); 
 			$this->queryResult = $this->stmt->fetchAll(PDO::FETCH_ASSOC) ?? [];
 			if(empty($this->queryResult) || $this->queryResult === false){ $this->queryResult = []; return []; }
 			return $this->mapResult($mapColumnToAttribute,$mode,$isSingleResult);
 		}catch(\Throwable $t){
-			die(
-				'DB: error while fetching data. '
-				.PHP_EOL.$t->getMessage()
-				.PHP_EOL.$t->getLine()
-			); 
+			throw new Exception(
+				message : 'DB: error while fetching data.  '
+				.PHP_EOL.'line '.$t->getLine()
+				,previous : self::$exposeErrorMessages ? $t : null
+			);
+			die(); 
 		}
 	}
 
 	public function first(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : array|stdClass|null {
 		self::checkReady();
 		try{
-			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
-			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
+			if( is_null($this->stmt) ){ throw new Exception('no query prepared'); }
+			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new Exception('invalid PDO fetch mode'); }
 			$this->query("SELECT * FROM (".$this->sql.") a LIMIT 1", $this->queryParams);	
 			return $this->get($mode,$mapColumnToAttribute, isSingleResult : true) ?? null;
 		}catch(\Throwable $t){
-			die(
-				'DB: error while preparing the query. '
-				.PHP_EOL.$t->getMessage()
-				.PHP_EOL.$t->getLine()
-			); 
+			throw new Exception(
+				message : 'DB: error while preparing the query.  '
+				.PHP_EOL.'line '.$t->getLine()
+				,previous : self::$exposeErrorMessages ? $t : null
+			);
+			die(); 
 		}
 	}
 
-	public function paginate(int $perPage = 15, ?string $pageGETParamName = 'page', ?int $page = null, int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : PaginatedDataset{
+	public function paginate(null|int|string $perPage = 'per_page', null|int|string $page = 'page', int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : PaginatedDataset{
 		self::checkReady();	
 		try{
-			if( is_null($this->stmt) ){ throw new \Exception('no query prepared'); }
-			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new \Exception('invalid PDO fetch mode'); }
+			if( is_null($this->stmt) ){ throw new Exception('no query prepared'); }
+			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new Exception('invalid PDO fetch mode'); }
+
+			if(is_null($perPage)){ $perPage = 'per_page'; }
+			if(is_null($page)){ $page = 'page'; }
 
 			$dataset = new PaginatedDataset();
 			$originalSql = $this->sql;
@@ -265,12 +272,20 @@ class DB {
 			$db->first(PDO::FETCH_ASSOC);
 			$dataset->total = $db->queryResult['C'] ?? 0; 
 
-			//ottieni pagina corrente da parametro o da GET, fallback a 1
-			if($page !== null){ $dataset->currentPage = max(1, $page); }
+			//ottieni perPage da parametro o da GET, fallback a 15
+			if(is_int($perPage)){ $dataset->perPage = max(1, $perPage); }
 			else{
-				$dataset->currentPage = array_key_exists($pageGETParamName,$_GET) && !empty($_GET[$pageGETParamName]) && ( ((int) $_GET[$pageGETParamName]) > 0 ) ? $_GET[$pageGETParamName] : 1; 
-				$dataset->perPage = $perPage;
-				$dataset->lastPage = max(1, ((int) ceil($dataset->total / $perPage)) );
+				$chk = array_key_exists($perPage,$_GET) && !empty($_GET[$perPage]) && ( ((int) $_GET[$perPage]) > 0 );
+				$dataset->perPage = $chk ? $_GET[$perPage] : 15; 
+			}
+
+			//ottieni pagina corrente da parametro o da GET, fallback a 1
+			if(is_int($page)){ $dataset->currentPage = max(1, $page); }
+			else{
+				$chk = array_key_exists($page,$_GET) && !empty($_GET[$page]) && ( ((int) $_GET[$page]) > 0 );
+				$dataset->currentPage = $chk ? $_GET[$page] : 1;
+				$dataset->perPage = $dataset->perPage;
+				$dataset->lastPage = max(1, ((int) ceil($dataset->total / $dataset->perPage)) );
 			}
 
 			//usa query originale con limit e offset per ottenere record della pagina corrente
@@ -284,11 +299,12 @@ class DB {
 			return $dataset;	
 
 		}catch(\Throwable $t){
-			die(
-				'DB: error while paginating the results. '
-				.PHP_EOL.$t->getMessage()
-				.PHP_EOL.$t->getLine()
-			); 
+			throw new Exception(
+				message : 'DB: error while paginating the results.  '
+				.PHP_EOL.'line '.$t->getLine(),
+				previous : self::$exposeErrorMessages ? $t : null
+			);
+			die(); 
 		}	
 	}
 
@@ -320,11 +336,12 @@ class DB {
 			$this->queryResult = $isSingleResult ? $finalResults[0] : $finalResults;
 			return $this->queryResult;
 		}catch(\Throwable $t){
-			die(
-				'DB: error while mapping the column. '
-				.PHP_EOL.$t->getMessage()
-				.PHP_EOL.$t->getLine()
-			); 
+			throw new Exception(
+				message : 'DB: error while mapping the column.  '
+				.PHP_EOL.'line '.$t->getLine(),
+				previous : self::$exposeErrorMessages ? $t : null
+			);
+			die(); 
 		}	
 	}
 
@@ -336,7 +353,7 @@ class PaginatedDataset{
 	public int $currentPage; 
 	public int $lastPage;
 	public int $perPage;
-	public array $items; 
+	public array $items;
 
 	public function __construct(
 		int $total = 0,
@@ -353,7 +370,5 @@ class PaginatedDataset{
 		$this->items = $items;
 
 	}
-
-}
 
 }
