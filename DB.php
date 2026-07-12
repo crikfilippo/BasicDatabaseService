@@ -7,9 +7,30 @@ use PDO;
 use PDOStatement;
 use Exception;
 
+/**
+ *
+ * @author Filippo Maria Grilli
+ * @github crikfilippo
+ * @version 1.0.0
+ * @since 2026-01-15
+ * @license MIT
+ *
+ */
+
+
+/**
+ * @method self query(string $sql, array $params = []) Prepare SQL query
+ * @method static self query(string $sql, array $params = []) Prepare SQL query
+ * @method ?int execute() Execute prepared query, returns ID or affected rows
+ * @method array|stdClass|null get(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Fetch all results
+ * @method array|stdClass|null first(int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Fetch first result
+ * @method PaginatedDataset paginate(null|int|string $page = 'page', null|int|string $perPage = 'per_page', int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) Paginate results
+ */
+
 class DB {
 
 	private static bool $exposeErrorMessages = false;
+	private static int $sessionTimeout = 300; //seconds
 	private static $allowedPDOModes = [PDO::FETCH_ASSOC, PDO::FETCH_OBJ];
 	private static ?string $host = null;
 	private static ?int $port = null;
@@ -259,12 +280,22 @@ class DB {
 			if( is_null($this->stmt) ){ throw new Exception('no query prepared'); }
 			if( ! in_array($mode,self::$allowedPDOModes) ){ throw new Exception('invalid PDO fetch mode'); }
 
+			if (session_status() === PHP_SESSION_NONE) {
+    			if (headers_sent($file, $line)) { throw new Exception("Cannot start session: output already sent in $file:$line"); }
+				session_start();
+			}
+
 			if(is_null($perPage)){ $perPage = 'per_page'; }
 			if(is_null($page)){ $page = 'page'; }
 
 			$dataset = new PaginatedDataset();
 			$originalSql = $this->sql;
 			$originalParams = $this->queryParams;
+
+			//ottieni dati da session
+			$md5HashSql = md5($originalSql.serialize($originalParams));
+			$sessionTimestamp = $_SESSION['paginated_dataset'][$md5HashSql]['timestamp'] ?? null;
+			$isSessionExpired = is_null($sessionTimestamp) || (time() - $sessionTimestamp) > self::$sessionTimeout;
 
 			//ottieni perPage da parametro o da GET, fallback a 15
 			if(is_int($perPage)){ $dataset->perPage = max(1, $perPage); }
@@ -274,21 +305,30 @@ class DB {
 			}
 
 			//ottieni pagina corrente da parametro o da GET, fallback a 1
+			$dataset->total = null;
+			$dataset->lastPage = null;
 			if(is_int($page)){ $dataset->currentPage = max(1, $page); }
 			else{
 				$chk = array_key_exists($page,$_GET) && !empty($_GET[$page]) && ( ((int) $_GET[$page]) > 0 );
-				$dataset->currentPage = $chk ? $_GET[$page] : 1;
-				$dataset->perPage = $dataset->perPage;
-				$dataset->lastPage = max(1, ((int) ceil($dataset->total / $dataset->perPage)) );
+				$dataset->currentPage = $chk ? $_GET[$page] : 1;	
 			}
 
 			//usa query originale per contare totale record (solo prima pagina)
-			$dataset->total = null;
-			if($dataset->currentPage == 1){
+			if($dataset->currentPage == 1 || $isSessionExpired){
 				$db = new self();
 				$db->query("SELECT count(*) C FROM (".$originalSql.") a", $originalParams);
 				$db->first(PDO::FETCH_ASSOC);
 				$dataset->total = $db->queryResult['C'] ?? 0; 
+				$dataset->lastPage = max(1, ((int) ceil($dataset->total / $dataset->perPage)) );
+				$_SESSION['paginated_dataset'][$md5HashSql] = [
+					'total' => $dataset->total,
+					'lastPage' => $dataset->lastPage,
+					'timestamp' => time()
+				];
+			}
+			elseif(isset($_SESSION['paginated_dataset'][$md5HashSql])){
+				$dataset->total = $_SESSION['paginated_dataset'][$md5HashSql]['total'];
+				$dataset->lastPage = $_SESSION['paginated_dataset'][$md5HashSql]['lastPage'];
 			}
 
 			//usa query originale con limit e offset per ottenere record della pagina corrente
@@ -352,18 +392,18 @@ class DB {
 
 class PaginatedDataset{
 
-	public ?int $total;    
-	public int $currentPage; 
-	public int $lastPage;
-	public int $perPage;
 	public array $items;
-
+	public ?int $currentPage; 
+	public ?int $perPage;
+	public ?int $lastPage;
+	public ?int $total; 
+	
 	public function __construct(
-		?int $total = 0,
-		int $currentPage = 1,
-		int $lastPage = 1,
-		int $perPage = 15,
-		array $items = []
+		array $items = [],
+		?int $currentPage = null,
+		?int $perPage = null,
+		?int $total = null,
+		?int $lastPage = null,
 	 ){
 
 		$this->total = $total;
