@@ -265,12 +265,6 @@ class DB {
 			$dataset = new PaginatedDataset();
 			$originalSql = $this->sql;
 			$originalParams = $this->queryParams;
-			
-			//usa query originale per contare totale record
-			$db = new self();
-			$db->query("SELECT count(*) C FROM (".$originalSql.") a", $originalParams);
-			$db->first(PDO::FETCH_ASSOC);
-			$dataset->total = $db->queryResult['C'] ?? 0; 
 
 			//ottieni perPage da parametro o da GET, fallback a 15
 			if(is_int($perPage)){ $dataset->perPage = max(1, $perPage); }
@@ -286,6 +280,15 @@ class DB {
 				$dataset->currentPage = $chk ? $_GET[$page] : 1;
 				$dataset->perPage = $dataset->perPage;
 				$dataset->lastPage = max(1, ((int) ceil($dataset->total / $dataset->perPage)) );
+			}
+
+			//usa query originale per contare totale record (solo prima pagina)
+			$dataset->total = null;
+			if($dataset->currentPage == 1){
+				$db = new self();
+				$db->query("SELECT count(*) C FROM (".$originalSql.") a", $originalParams);
+				$db->first(PDO::FETCH_ASSOC);
+				$dataset->total = $db->queryResult['C'] ?? 0; 
 			}
 
 			//usa query originale con limit e offset per ottenere record della pagina corrente
@@ -349,19 +352,19 @@ class DB {
 
 class PaginatedDataset{
 
-	public int $total;    
+	public ?int $total;    
 	public int $currentPage; 
 	public int $lastPage;
 	public int $perPage;
 	public array $items;
 
 	public function __construct(
-		int $total = 0,
+		?int $total = 0,
 		int $currentPage = 1,
 		int $lastPage = 1,
 		int $perPage = 15,
 		array $items = []
-	){
+	 ){
 
 		$this->total = $total;
 		$this->currentPage = $currentPage;
