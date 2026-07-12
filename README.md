@@ -138,7 +138,12 @@ $deletedRows = $db->query(
 ```php
 $paginated = DB::query(
     'SELECT * FROM users ORDER BY id DESC'
-)->paginate(perPage: 10);
+)->paginate(page : 1, perPage: 10);
+
+//page && perPage ints : specific page number and number of results
+//page && perPage strings : GET params name used to obtain paginating params
+//page || perPage nulls : defaule GET params name to obtain paginating params
+//fallback to page 1, perPage 15
 
 // Access paginated data
 echo "Total: " . $paginated->total;
@@ -220,9 +225,9 @@ echo $count['total'];
 
 ## Features
 
-- ✅ Prepared statements (SQL injection prevention)
-- ✅ Static and object-oriented usage
-- ✅ Flexible result modes (objects or arrays)
-- ✅ Column mapping/transformation
-- ✅ Built-in pagination
-- ✅ Sensitive parameter masking in error logs
+- Prepared statements (SQL injection prevention)
+- Static and object-oriented usage
+- Flexible result modes (objects or arrays)
+- Column mapping/transformation
+- Built-in pagination
+- Sensitive parameter masking in error logs
