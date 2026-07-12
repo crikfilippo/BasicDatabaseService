@@ -253,7 +253,7 @@ class DB {
 		}
 	}
 
-	public function paginate(null|int|string $perPage = 'per_page', null|int|string $page = 'page', int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : PaginatedDataset{
+	public function paginate(null|int|string $page = 'page', null|int|string $perPage = 'per_page', int $mode = PDO::FETCH_OBJ, ?array $mapColumnToAttribute = null) : PaginatedDataset{
 		self::checkReady();	
 		try{
 			if( is_null($this->stmt) ){ throw new Exception('no query prepared'); }
